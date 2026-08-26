@@ -8,24 +8,27 @@ The workflow is defined in `.github/workflows/ci.yml`.
  
 **Trigger**: the pipeline runs automatically on every `push` to the repository, and on every `pull_request` targeting it when the PR is opened, synchronized (new commits pushed), or reopened — this lets both checks run on a PR before it is merged, not only after commits land directly on a branch.
  
-**Jobs**: the workflow contains two jobs, `lint` and `test`, both running on an `ubuntu-latest` machine.
+**Jobs**: the workflow contains three jobs, `lint`, `test`, and `deploy`, all running on an `ubuntu-latest` machine.
 - `lint` — checks the code style of `app.py` with flake8.
 - `test` — runs the test suite in `test_app.py` with pytest, using a matrix so it runs across several Python versions in parallel instead of just one.
+- `deploy` — represents the deployment step, gated so it only runs after `lint` and `test` have both succeeded, and only on the `main` branch.
 **Steps of the `lint` job**:
 1. **Checkout** (`actions/checkout@v4`) — fetches the repository's code onto the runner, making it available to the following steps.
 2. **Setup Python** (`actions/setup-python@v7`) — installs Python 3.13 on the runner, restoring pip dependencies from cache when one matches instead of redownloading them.
-3. **Run linter** — installs `flake8`, then runs it against `app.py` to check code style and catch obvious errors.
+3. **Run linter** — installs the dependencies from `requirements.txt`, then runs `flake8` against `app.py` to check code style and catch obvious errors.
 **Steps of the `test` job**:
 1. **Checkout** (`actions/checkout@v4`) — fetches the repository's code onto the runner, making it available to the following steps.
 2. **Setup Python** (`actions/setup-python@v7`) — installs the Python version for that matrix instance (`3.11`, `3.12`, or `3.13`) on the runner, restoring pip dependencies from cache when one matches instead of redownloading them.
-3. **Run tests** — installs `pytest` and `flask`, then runs `pytest` against `test_app.py` on that Python version to check the app still behaves as expected.
-If both jobs complete without errors, the pipeline finishes successfully (green); otherwise, the failing job's run shows the error details in its logs.
+3. **Run tests** — installs the dependencies from `requirements.txt`, then runs `pytest` on that Python version to check the app still behaves as expected.
+**Steps of the `deploy` job**:
+1. **Use secret safely** — reads `DEPLOY_TOKEN` from the repository's secrets and only prints its length, never its value (see "Secrets and Gating" below).
+If all three jobs complete without errors, the pipeline finishes successfully (green); otherwise, the failing job's run shows the error details in its logs.
  
 ## Successful run
  
-Example of a run where the pipeline completed successfully: [run #32945220553](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32945220553)
+Example of a run where the pipeline completed successfully: [run #33009267438](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/33009267438)
  
-This link shows both the `lint` and `test` jobs passing together: checkout, Python setup, linting of `app.py`, and the `pytest` suite in `test_app.py` all completed without errors.
+This link shows all three jobs passing together: `lint` and `test` complete first, then `deploy` runs after them on `main`, gated behind their success.
  
 ## Proof the `test` job actually checks the code
  
@@ -55,15 +58,43 @@ To measure the gain, the same `run linter` step was timed on two runs of the `li
 - **With cache hit** (after caching was added, on a later push): [run #13](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32991820368/job/98250940437) — `run linter` took **4s**, job total **9s**. The `setup python` step log confirms `Cache hit for: setup-python-Linux-x64-...-pip-...` followed by `Cache restored successfully`.
 That's roughly a **33% reduction** on the `run linter` step (and about 25% on the job as a whole) once the pip cache is warm.
  
+## Secrets and Gating
+ 
+### The secret
+ 
+The `deploy` job uses one secret, `DEPLOY_TOKEN`. It's stored in the repository's own settings (**Settings → Secrets and variables → Actions**), not in `ci.yml`, and the workflow only ever references it through the `secrets` context: `${{ secrets.DEPLOY_TOKEN }}`, injected into the step as the `DEPLOY_TOKEN` environment variable. The value never appears anywhere in the YAML file itself.
+ 
+To prove the token is never exposed, the step doesn't print `$DEPLOY_TOKEN` — it prints `${#DEPLOY_TOKEN}`, the bash syntax for a variable's **length**:
+ 
+```bash
+echo "Token length: ${#DEPLOY_TOKEN}"
+```
+ 
+That's a valid proof because a length is just a number (e.g. `Token length: 40`) — it confirms the secret was received by the job without ever putting the actual value in the logs. Even if this number were somehow sensitive, GitHub Actions also automatically masks any log output that matches a registered secret's value, replacing it with `***` — so the design here removes the risk entirely instead of relying on that safety net.
+ 
+### The gating
+ 
+The `deploy` job carries two conditions:
+ 
+- **`needs: [lint, test]`** — `deploy` doesn't start until both `lint` and `test` have finished successfully. If either one fails, `deploy` is skipped automatically, GitHub Actions never launches it.
+- **`if: github.ref == 'refs/heads/main'`** — even once `lint` and `test` pass, `deploy` only runs when the workflow is evaluating the `main` branch. It never runs for a `pull_request` or a push to any other branch.
+Without `needs`, `deploy` would start in parallel with `lint` and `test`, regardless of whether they pass — meaning broken or unlinted code could reach the deploy step before anyone (or anything) knew it had failed. Without `if`, every push and every pull request — including ones from a feature branch or an external PR — would trigger a deploy attempt, which is both dangerous (deploying unreviewed or work-in-progress code) and pointless outside of `main`. Together, `needs` and `if` make sure `deploy` only ever runs once, on validated code, on the branch that's actually meant to ship.
+ 
+### Proof
+ 
+Example of a run where all three jobs ran in the right order: [run #33009267438](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/33009267438)
+ 
+This run shows `lint` and `test` passing first, `deploy` starting only afterward on `main`, and its log printing the token's length without ever showing its value.
+ 
 ## Running locally
  
 ```bash
-pip install flake8
+pip install -r requirements.txt
 flake8 app.py
 python app.py
 ```
  
 ```bash
-pip install pytest flask
+pip install -r requirements.txt
 pytest
 ```
