@@ -13,11 +13,11 @@ The workflow is defined in `.github/workflows/ci.yml`.
 - `test` — runs the test suite in `test_app.py` with pytest, using a matrix so it runs across several Python versions in parallel instead of just one.
 **Steps of the `lint` job**:
 1. **Checkout** (`actions/checkout@v4`) — fetches the repository's code onto the runner, making it available to the following steps.
-2. **Setup Python** (`actions/setup-python@v7`) — installs Python 3.13 on the runner.
+2. **Setup Python** (`actions/setup-python@v7`) — installs Python 3.13 on the runner, restoring pip dependencies from cache when one matches instead of redownloading them.
 3. **Run linter** — installs `flake8`, then runs it against `app.py` to check code style and catch obvious errors.
 **Steps of the `test` job**:
 1. **Checkout** (`actions/checkout@v4`) — fetches the repository's code onto the runner, making it available to the following steps.
-2. **Setup Python** (`actions/setup-python@v7`) — installs the Python version for that matrix instance (`3.11`, `3.12`, or `3.13`) on the runner.
+2. **Setup Python** (`actions/setup-python@v7`) — installs the Python version for that matrix instance (`3.11`, `3.12`, or `3.13`) on the runner, restoring pip dependencies from cache when one matches instead of redownloading them.
 3. **Run tests** — installs `pytest` and `flask`, then runs `pytest` against `test_app.py` on that Python version to check the app still behaves as expected.
 If both jobs complete without errors, the pipeline finishes successfully (green); otherwise, the failing job's run shows the error details in its logs.
  
@@ -45,6 +45,16 @@ Example of a run where the whole matrix passed: [run #32955433159](https://githu
  
 This link shows all 4 checks green — `lint` plus the 3 `test` matrix versions — confirming the app behaves the same way across Python 3.11, 3.12, and 3.13.
  
+## Caching
+ 
+Both `lint` and `test` use the built-in pip cache of `actions/setup-python@v7` (the `cache: pip` input) — there is no separate `actions/cache` step; the caching happens inside the `setup python` step itself. When the cache key matches, pip's dependency cache is restored on the runner instead of being redownloaded from scratch.
+ 
+To measure the gain, the same `run linter` step was timed on two runs of the `lint` job:
+ 
+- **Without cache** (before caching was added): [run #10](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32955433159) — `run linter` took **6s**, job total **12s**.
+- **With cache hit** (after caching was added, on a later push): [run #13](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32991820368/job/98250940437) — `run linter` took **4s**, job total **9s**. The `setup python` step log confirms `Cache hit for: setup-python-Linux-x64-...-pip-...` followed by `Cache restored successfully`.
+That's roughly a **33% reduction** on the `run linter` step (and about 25% on the job as a whole) once the pip cache is warm.
+ 
 ## Running locally
  
 ```bash
@@ -57,5 +67,3 @@ python app.py
 pip install pytest flask
 pytest
 ```
-
-compare test
