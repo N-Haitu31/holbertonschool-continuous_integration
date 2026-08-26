@@ -18,13 +18,16 @@ jobs:
           pip install flake8
           flake8 app.py
   test:
+    strategy:
+      matrix:
+        python-versions: ['3.11', '3.12', '3.13']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: setup python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python-versions }}
       - name: run pytest
         run: |
           pip install pytest flask
