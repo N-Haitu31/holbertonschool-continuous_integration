@@ -2,6 +2,7 @@ name: ci
 
 on:
   push:
+  pull_request:
 
 jobs:
   lint:
@@ -16,3 +17,15 @@ jobs:
         run: |
           pip install flake8
           flake8 app.py
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: run pytest
+        run: |
+          pip install pytest flask
+          pytest
