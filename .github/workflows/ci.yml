@@ -19,6 +19,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           flake8 app.py
+
   test:
     strategy:
       matrix:
@@ -36,3 +37,14 @@ jobs:
         run: |
           pip install -r requirements.txt
           pytest
+
+  deploy:
+    needs: [lint, test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: use secret safely
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "Token length: ${#DEPLOY_TOKEN}"
