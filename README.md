@@ -24,19 +24,20 @@ The workflow is defined in `.github/workflows/ci.yml`.
 1. **Use secret safely** — reads `DEPLOY_TOKEN` from the repository's secrets and only prints its length, never its value (see "Secrets and Gating" below).
 If all three jobs complete without errors, the pipeline finishes successfully (green); otherwise, the failing job's run shows the error details in its logs.
  
-## Successful run
+## Successful run (Task 0)
  
 Example of a run where the pipeline completed successfully: [run #33009267438](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/33009267438)
  
 This link shows all three jobs passing together: `lint` and `test` complete first, then `deploy` runs after them on `main`, gated behind their success.
  
-## Proof the `test` job actually checks the code
+## Proof the `test` job actually checks the code (Task 1)
  
 To confirm the `test` job reacts to the code and isn't just always green, a test assertion was deliberately broken on a PR, then fixed in a follow-up commit:
  
 - Failing run (assertion broken): [run #32943398630](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32943398630)
 - Passing run (assertion fixed): [run #32945043164](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32945043164)
-## Matrix Testing
+
+## Matrix Testing (Task 2)
  
 The `test` job runs on a **matrix** of 3 Python versions in parallel: `3.11`, `3.12`, and `3.13`.
  
@@ -48,7 +49,7 @@ Example of a run where the whole matrix passed: [run #32955433159](https://githu
  
 This link shows all 4 checks green — `lint` plus the 3 `test` matrix versions — confirming the app behaves the same way across Python 3.11, 3.12, and 3.13.
  
-## Caching
+## Caching (Task 3)
  
 Both `lint` and `test` use the built-in pip cache of `actions/setup-python@v7` (the `cache: pip` input) — there is no separate `actions/cache` step; the caching happens inside the `setup python` step itself. When the cache key matches, pip's dependency cache is restored on the runner instead of being redownloaded from scratch.
  
@@ -58,7 +59,7 @@ To measure the gain, the same `run linter` step was timed on two runs of the `li
 - **With cache hit** (after caching was added, on a later push): [run #13](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32991820368/job/98250940437) — `run linter` took **4s**, job total **9s**. The `setup python` step log confirms `Cache hit for: setup-python-Linux-x64-...-pip-...` followed by `Cache restored successfully`.
 That's roughly a **33% reduction** on the `run linter` step (and about 25% on the job as a whole) once the pip cache is warm.
  
-## Secrets and Gating
+## Secrets and Gating (Task 4)
  
 ### The secret
  
