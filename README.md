@@ -26,9 +26,9 @@ If all three jobs complete without errors, the pipeline finishes successfully (g
  
 ## Successful run (Task 0)
  
-Example of a run where the pipeline completed successfully: [run #33009267438](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/33009267438)
+Example of a run where the pipeline completed successfully: [run #32851346014](https://github.com/N-Haitu31/holbertonschool-continuous_integration/actions/runs/32851346014)
  
-This link shows all three jobs passing together: `lint` and `test` complete first, then `deploy` runs after them on `main`, gated behind their success.
+At this point in the project, `ci.yml` had a single job, `lint`: this link shows it passing — checkout, Python setup, and `flake8` `app.py` all completing without errors — proof that the trigger and the plumbing worked, before `test`, the matrix, caching, and `deploy` were added in later tasks.
  
 ## Proof the `test` job actually checks the code (Task 1)
  
